@@ -1662,8 +1662,8 @@
       const data = await response.json();
 
       // レスポンスから画像パートを抽出
-      const parts = data?.candidates?.[0]?.content?.parts;
-      if (!parts || !Array.isArray(parts)) {
+      const responseParts = data?.candidates?.[0]?.content?.parts;
+      if (!responseParts || !Array.isArray(responseParts)) {
         // finish_reason を確認
         const finishReason = data?.candidates?.[0]?.finishReason;
         if (finishReason === 'SAFETY') {
@@ -1673,7 +1673,7 @@
       }
 
       // inlineData（画像）を持つパートを探す
-      const imagePart = parts.find(
+      const imagePart = responseParts.find(
         (p) => p.inlineData && typeof p.inlineData.data === 'string'
       );
       if (!imagePart) {
