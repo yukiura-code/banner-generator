@@ -340,18 +340,27 @@
     /* ── Error ── */
     #error-box {
       display: none;
-      background: rgba(255,85,85,0.06);
-      border: 1px solid rgba(255,85,85,0.25);
-      border-radius: 8px;
-      padding: 12px 16px;
-      color: var(--error);
-      font-size: 0.82rem;
-      margin-top: 12px;
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      min-width: 320px;
+      max-width: min(680px, calc(100vw - 32px));
+      background: rgba(20,0,0,0.96);
+      border: 1.5px solid rgba(255,85,85,0.7);
+      border-radius: 10px;
+      padding: 14px 20px;
+      color: #ff7070;
+      font-size: 0.88rem;
       line-height: 1.6;
-      box-shadow: 0 0 20px rgba(255,85,85,0.06);
+      box-shadow: 0 0 32px rgba(255,85,85,0.25), 0 4px 24px rgba(0,0,0,0.6);
+      text-align: center;
+      cursor: pointer;
     }
 
     #error-box::before { content: '⚠  '; font-weight: 700; }
+    #error-box::after  { content: '  ✕'; float: right; opacity: 0.55; font-size: 0.8em; }
 
     /* ── Loading ── */
     #loading {
@@ -1576,13 +1585,17 @@
       const box = document.getElementById('error-box');
       box.textContent = msg;
       box.style.display = 'block';
-      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      box.onclick = () => hideError();
+      // auto-hide after 8 s
+      clearTimeout(box._hideTimer);
+      box._hideTimer = setTimeout(() => hideError(), 8000);
     }
 
     function hideError() {
       const box = document.getElementById('error-box');
       box.textContent = '';
       box.style.display = 'none';
+      clearTimeout(box._hideTimer);
     }
 
     // =============================================
@@ -1937,9 +1950,11 @@ ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, bl
     // 両バナーを ZIP に格納してダウンロード
     // ── Particle canvas background ──
     (function() {
+      try {
       const canvas = document.getElementById('particle-canvas');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
+      if (!ctx) return;
       const COLORS = ['#a855f7', '#22d3ee', '#f472b6'];
       const COUNT  = 70;
       const DIST   = 170;
@@ -1999,6 +2014,7 @@ ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, bl
       resize();
       pts = Array.from({ length: COUNT }, make);
       frame();
+      } catch (_) {}
     })();
 
     // =============================================
