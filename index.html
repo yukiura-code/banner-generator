@@ -337,6 +337,38 @@
       box-shadow: none;
     }
 
+    /* ── Target selector ── */
+    .target-selector {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+    }
+    .target-btn {
+      flex: 1;
+      padding: 10px 8px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      color: var(--text-sub);
+      font-size: 0.83rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+      line-height: 1.5;
+      text-align: center;
+    }
+    .target-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.04); }
+    .target-btn.active {
+      background: var(--surface-2);
+      color: var(--text);
+      border-color: var(--border-2);
+      box-shadow: 0 0 12px var(--neon-glow);
+    }
+    .target-btn-sub { font-size: 0.72rem; opacity: 0.55; display: block; margin-top: 2px; }
+
     /* ── Error ── */
     #error-box {
       display: none;
@@ -1082,6 +1114,27 @@
       </p>
     </div>
 
+    <!-- 生成対象選択 -->
+    <div class="card">
+      <h2 class="card-title" style="margin-bottom:14px;">
+        <span class="icon">🎯</span> 生成対象
+      </h2>
+      <div class="target-selector">
+        <button class="target-btn" id="target-btn-rakuten" onclick="setTarget('rakuten')">
+          楽天のみ
+          <span class="target-btn-sub">1080 × 270 px</span>
+        </button>
+        <button class="target-btn active" id="target-btn-both" onclick="setTarget('both')">
+          両方
+          <span class="target-btn-sub">楽天 + LINE</span>
+        </button>
+        <button class="target-btn" id="target-btn-line" onclick="setTarget('line')">
+          LINE のみ
+          <span class="target-btn-sub">1040 × 585 px</span>
+        </button>
+      </div>
+    </div>
+
     <!-- 生成ボタン -->
     <button
       class="btn-generate"
@@ -1129,7 +1182,7 @@
         <div class="preview-grid">
 
           <!-- 楽天バナー -->
-          <div>
+          <div id="preview-rakuten-card">
             <div class="preview-item-title">
               <span class="platform-badge badge-rakuten">楽天</span>
               楽天用バナー
@@ -1151,7 +1204,7 @@
           </div>
 
           <!-- LINEバナー -->
-          <div>
+          <div id="preview-line-card">
             <div class="preview-item-title">
               <span class="platform-badge badge-line">LINE</span>
               LINE 用バナー
@@ -1176,7 +1229,7 @@
       </div>
 
       <!-- ZIP一括ダウンロードカード -->
-      <div class="card">
+      <div class="card" id="zip-card">
         <h2 class="card-title">
           <span class="icon">📦</span> ZIP 一括ダウンロード
         </h2>
@@ -1229,6 +1282,7 @@
     let rakutenDataUrl = null;  // 楽天用バナー（1080×270）
     let lineDataUrl    = null;  // LINE用バナー（1040×585）
     let currentProductName = ''; // ZIP ファイル名に使用
+    let bannerTarget = 'both';  // 'rakuten' | 'line' | 'both'
 
     // =============================================
     // 初期化: ページ読み込み時に localStorage からAPIキーを復元
@@ -1483,6 +1537,13 @@
     // =============================================
     // テストモード切替（APIキー欄の表示/非表示）
     // =============================================
+    function setTarget(t) {
+      bannerTarget = t;
+      ['rakuten', 'both', 'line'].forEach(id => {
+        document.getElementById('target-btn-' + id).classList.toggle('active', id === t);
+      });
+    }
+
     function toggleTestMode() {
       const isTest = document.getElementById('test-mode').checked;
       const apiCard = document.querySelector('.card:has(#api-key)');
@@ -1790,20 +1851,29 @@
       lineDataUrl    = null;
 
       try {
-        // =============================================
-        // STEP 1: 楽天用バナー生成（4:1 比率）
-        // =============================================
-        setStep(1, 'active');
-        document.getElementById('status-msg').textContent =
-          '楽天用バナーを生成中... (1/2)';
-
+        const target      = bannerTarget;
         const promptSuffix = buildPromptSuffix(feedbackText);
-
-        const saleLabel = saleType === 'point'
+        const saleLabel   = saleType === 'point'
           ? `${saleRate || '?'}倍ポイント`
           : `${saleRate || '?'}%OFF`;
+        const total = (target === 'both') ? 2 : 1;
 
-        const rakutenPrompt = `You are a professional Japanese e-commerce banner designer. Create a HIGH-QUALITY, PHOTOREALISTIC promotional banner image strictly following these specifications.
+        // ステップリスト: 単体生成時は STEP 2 を非表示
+        document.getElementById('step-2').style.display = (target === 'both') ? '' : 'none';
+        document.getElementById('step-1').innerHTML =
+          `<span class="step-num">1</span> ${target === 'line' ? 'LINE' : '楽天'}用バナーを生成中`;
+
+        let rakutenRaw = null, lineRaw = null;
+
+        // =============================================
+        // 楽天用バナー生成（楽天のみ or 両方）
+        // =============================================
+        if (target === 'rakuten' || target === 'both') {
+          setStep(1, 'active');
+          document.getElementById('status-msg').textContent =
+            `楽天用バナーを生成中... (1/${total})`;
+
+          const rakutenPrompt = `You are a professional Japanese e-commerce banner designer. Create a HIGH-QUALITY, PHOTOREALISTIC promotional banner image strictly following these specifications.
 
 ━━ BANNER SPECS ━━
 Format: Horizontal wide banner for Rakuten marketplace (4:1 aspect ratio)
@@ -1828,18 +1898,22 @@ ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, bl
 - Decorative elements: sale tag, ribbon, star burst, or geometric accent
 - Typography: clean sans-serif, modern, no decorative scripts${promptSuffix}`;
 
-        const rakutenRaw = isTestMode
-          ? await callTestImageAPI(rakutenPrompt, 1080, 270)
-          : await callGeminiImageAPI(rakutenPrompt, apiKey);
+          rakutenRaw = isTestMode
+            ? await callTestImageAPI(rakutenPrompt, 1080, 270)
+            : await callGeminiImageAPI(rakutenPrompt, apiKey);
+          setStep(1, 'done');
+        }
 
         // =============================================
-        // STEP 2: LINE用バナー生成（16:9 比率）
+        // LINE用バナー生成（LINE のみ or 両方）
         // =============================================
-        setStep(2, 'active');
-        document.getElementById('status-msg').textContent =
-          'LINE 用バナーを生成中... (2/2)';
+        if (target === 'line' || target === 'both') {
+          const lineStep = (target === 'both') ? 2 : 1;
+          setStep(lineStep, 'active');
+          document.getElementById('status-msg').textContent =
+            `LINE 用バナーを生成中... (${target === 'both' ? '2/2' : '1/1'})`;
 
-        const linePrompt = `You are a professional Japanese e-commerce banner designer. Create a HIGH-QUALITY, PHOTOREALISTIC promotional banner image strictly following these specifications.
+          const linePrompt = `You are a professional Japanese e-commerce banner designer. Create a HIGH-QUALITY, PHOTOREALISTIC promotional banner image strictly following these specifications.
 
 ━━ BANNER SPECS ━━
 Format: LINE Rich Message / LINE VOOM banner (16:9 aspect ratio)
@@ -1864,38 +1938,43 @@ ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, bl
 - Decorative elements: sale tag, ribbon, star burst, or geometric accent
 - Typography: clean sans-serif, modern, no decorative scripts${promptSuffix}`;
 
-        const lineRaw = isTestMode
-          ? await callTestImageAPI(linePrompt, 1040, 585)
-          : await callGeminiImageAPI(linePrompt, apiKey);
+          lineRaw = isTestMode
+            ? await callTestImageAPI(linePrompt, 1040, 585)
+            : await callGeminiImageAPI(linePrompt, apiKey);
+          setStep(lineStep, 'done');
+        }
 
         // =============================================
         // STEP 3: Canvas API でリサイズ
-        // 楽天: 1080×270px / LINE: 1040×585px
         // =============================================
         setStep(3, 'active');
-        document.getElementById('status-msg').textContent =
-          '画像をリサイズ中...';
+        document.getElementById('status-msg').textContent = '画像をリサイズ中...';
 
-        rakutenDataUrl = await resizeImage(
-          rakutenRaw.data, rakutenRaw.mimeType,
-          1080, 270   // 楽天 4:1
-        );
-        lineDataUrl = await resizeImage(
-          lineRaw.data, lineRaw.mimeType,
-          1040, 585   // LINE ≒16:9
-        );
+        if (rakutenRaw) {
+          rakutenDataUrl = await resizeImage(rakutenRaw.data, rakutenRaw.mimeType, 1080, 270);
+        }
+        if (lineRaw) {
+          lineDataUrl = await resizeImage(lineRaw.data, lineRaw.mimeType, 1040, 585);
+        }
 
         setStep(3, 'done');
 
         // =============================================
-        // プレビュー表示
+        // プレビュー表示（生成対象のみ）
         // =============================================
-        document.getElementById('preview-rakuten').src = rakutenDataUrl;
-        document.getElementById('preview-line').src    = lineDataUrl;
+        document.getElementById('preview-rakuten-card').style.display =
+          (target !== 'line') ? '' : 'none';
+        document.getElementById('preview-line-card').style.display =
+          (target !== 'rakuten') ? '' : 'none';
+        document.getElementById('zip-card').style.display =
+          (target === 'both') ? '' : 'none';
+
+        if (rakutenDataUrl) document.getElementById('preview-rakuten').src = rakutenDataUrl;
+        if (lineDataUrl)    document.getElementById('preview-line').src    = lineDataUrl;
+
         document.getElementById('preview-section').style.display = 'block';
         document.getElementById('loading').style.display = 'none';
 
-        // プレビュー位置にスムーズスクロール
         setTimeout(() => {
           document.getElementById('preview-section').scrollIntoView({
             behavior: 'smooth', block: 'start'
