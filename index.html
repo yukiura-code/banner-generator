@@ -457,6 +457,98 @@
     }
 
     /* =============================================
+       参考画像アップロード
+    ============================================= */
+    .upload-zone {
+      border: 2px dashed #b0c4de;
+      border-radius: 12px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: #f8fafd;
+      transition: border-color 0.2s, background 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: #1a73e8;
+      background: #eef3fd;
+    }
+
+    .upload-zone-icon {
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    .upload-zone p {
+      font-size: 0.88rem;
+      color: #555;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .ref-images-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .ref-images-grid { grid-template-columns: 1fr; }
+    }
+
+    .ref-image-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ref-image-preview {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1.5px solid #e0e0e0;
+      background: repeating-conic-gradient(#e8e8e8 0% 25%, #f5f5f5 0% 50%) 0 0 / 16px 16px;
+      aspect-ratio: 4/3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ref-image-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .ref-image-remove {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      border: none;
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+
+    .ref-image-remove:hover { background: rgba(200,0,0,0.8); }
+
+    /* =============================================
        追加指示・フィードバック
     ============================================= */
     .form-textarea {
@@ -708,6 +800,43 @@
           placeholder="例: 6/20(木)〜6/22(日) 23:59まで"
         />
       </div>
+    </div>
+
+    <!-- =============================================
+         参考画像アップロードカード
+    ============================================= -->
+    <div class="card">
+      <h2 class="card-title">
+        <span class="icon">📷</span> 参考画像
+        <span class="optional" style="font-size:0.78rem;font-weight:400;color:#aaa;margin-left:6px;">任意・最大3枚</span>
+      </h2>
+      <p class="input-note" style="margin-bottom:14px;">
+        商品画像・デザイン参考・ロゴなどをアップロードすると、それをもとにバナーが生成されます。各画像に役割ラベルを設定してください。<br>
+        ※ テストモード（Pollinations.ai）では参考画像は使用されません。
+      </p>
+
+      <div
+        class="upload-zone"
+        id="upload-zone"
+        onclick="document.getElementById('ref-image-input').click()"
+        ondragover="handleDragOver(event)"
+        ondragleave="handleDragLeave(event)"
+        ondrop="handleDrop(event)"
+      >
+        <div class="upload-zone-icon">📎</div>
+        <p>クリックまたはドラッグ＆ドロップで画像を追加</p>
+        <p class="input-note" style="margin:0;">PNG・JPG・WEBP 対応</p>
+      </div>
+      <input
+        type="file"
+        id="ref-image-input"
+        accept="image/*"
+        multiple
+        style="display:none"
+        onchange="handleImageSelect(event)"
+      />
+
+      <div class="ref-images-grid" id="ref-images-grid"></div>
     </div>
 
     <!-- =============================================
@@ -983,6 +1112,114 @@
     });
 
     // =============================================
+    // 参考画像の管理
+    // =============================================
+    let refImages = []; // [{ id, dataUrl, mimeType, base64, label }]
+
+    const REF_LABEL_MAP = {
+      product: { emoji: '📦', text: '商品画像',     en: 'product image — use the appearance of this product as the main visual subject of the banner' },
+      design:  { emoji: '🎨', text: 'デザイン参考', en: 'design reference — replicate the color scheme, layout style, and overall aesthetic of this image' },
+      logo:    { emoji: '🏷', text: 'ロゴ・ブランド', en: 'brand logo — incorporate this logo into the banner design' },
+      other:   { emoji: '📎', text: 'その他参考',   en: 'reference image — use as visual inspiration' },
+    };
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      document.getElementById('upload-zone').classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      document.getElementById('upload-zone').classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      document.getElementById('upload-zone').classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      processImageFiles(files);
+    }
+
+    function handleImageSelect(e) {
+      processImageFiles(Array.from(e.target.files));
+      e.target.value = '';
+    }
+
+    async function processImageFiles(files) {
+      const slots = 3 - refImages.length;
+      for (const file of files.slice(0, slots)) {
+        await addRefImage(file);
+      }
+    }
+
+    async function addRefImage(file) {
+      if (refImages.length >= 3) return;
+      const resized = await resizeImageForUpload(file);
+      refImages.push({
+        id:      Date.now() + Math.random().toString(36).slice(2),
+        dataUrl: resized.dataUrl,
+        mimeType: resized.mimeType,
+        base64:  resized.base64,
+        label:   'product',
+      });
+      renderRefImages();
+    }
+
+    function removeRefImage(id) {
+      refImages = refImages.filter(img => img.id !== id);
+      renderRefImages();
+    }
+
+    function updateRefImageLabel(id, label) {
+      const img = refImages.find(i => i.id === id);
+      if (img) img.label = label;
+    }
+
+    function renderRefImages() {
+      const grid = document.getElementById('ref-images-grid');
+      const zone = document.getElementById('upload-zone');
+      zone.style.display = refImages.length >= 3 ? 'none' : 'flex';
+
+      grid.innerHTML = refImages.map(img => {
+        const options = Object.entries(REF_LABEL_MAP).map(([val, info]) =>
+          `<option value="${val}" ${img.label === val ? 'selected' : ''}>${info.emoji} ${info.text}</option>`
+        ).join('');
+        return `
+          <div class="ref-image-item">
+            <div class="ref-image-preview">
+              <img src="${img.dataUrl}" alt="参考画像" />
+              <button class="ref-image-remove" onclick="removeRefImage('${img.id}')">✕</button>
+            </div>
+            <select class="form-select" style="font-size:0.8rem;padding:7px 10px;"
+              onchange="updateRefImageLabel('${img.id}', this.value)">${options}</select>
+          </div>`;
+      }).join('');
+    }
+
+    async function resizeImageForUpload(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxSize = 1024;
+            let w = img.width, h = img.height;
+            if (w > maxSize || h > maxSize) {
+              if (w >= h) { h = Math.round(h * maxSize / w); w = maxSize; }
+              else        { w = Math.round(w * maxSize / h); h = maxSize; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            resolve({ dataUrl, mimeType: 'image/jpeg', base64: dataUrl.split(',')[1] });
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // =============================================
     // 会社・ブランド設定の管理
     // =============================================
     function loadCompanySettings() {
@@ -1071,7 +1308,16 @@
         } catch (_) {}
       }
       const extra = document.getElementById('extra-instructions').value.trim();
-      if (extra)        lines.push(`Additional instructions: ${extra}`);
+      if (extra) lines.push(`Additional instructions: ${extra}`);
+
+      if (refImages.length > 0) {
+        const descs = refImages.map((img, i) => {
+          const info = REF_LABEL_MAP[img.label] || REF_LABEL_MAP.other;
+          return `  - Attached image ${i + 1}: ${info.en}`;
+        });
+        lines.push(`Reference images are attached to this request:\n${descs.join('\n')}\nUse these images directly as visual input when composing the banner.`);
+      }
+
       if (feedbackText) lines.push(`Improvement feedback from user: ${feedbackText}`);
       return lines.length > 0 ? '\n\n' + lines.join('\n') : '';
     }
@@ -1218,12 +1464,15 @@
       const endpoint =
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+      // テキストプロンプト + 参考画像（アップロードされている場合）
+      const parts = [{ text: prompt }];
+      for (const img of refImages) {
+        parts.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
+      }
+
       const requestBody = {
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
+        contents: [{ parts }],
         generationConfig: {
-          // TEXT も含めることで応答の安定性を高める
           responseModalities: ['IMAGE', 'TEXT']
         }
       };
