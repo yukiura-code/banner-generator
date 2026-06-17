@@ -186,13 +186,12 @@
       border-radius: 12px;
       padding: 24px 28px;
       margin-bottom: 12px;
-      transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+      transition: border-color 0.25s, box-shadow 0.25s;
     }
 
     .card:hover {
       border-color: rgba(168,85,247,0.55);
-      box-shadow: 0 0 40px rgba(168,85,247,0.14), inset 0 0 40px rgba(168,85,247,0.05);
-      transform: translateY(-1px);
+      box-shadow: 0 0 40px rgba(168,85,247,0.16), 0 4px 24px rgba(168,85,247,0.1), inset 0 0 40px rgba(168,85,247,0.05);
     }
 
     .card-title {
@@ -937,7 +936,7 @@
          会社・ブランド設定カード（管理者向け）
     ============================================= -->
     <div class="card" id="company-settings-card">
-      <h2 class="card-title" onclick="toggleCompanySettings()">
+      <h2 class="card-title" id="company-settings-title">
         <span class="icon">⚙️</span> 会社・ブランド設定
         <span class="toggle-icon" id="company-settings-toggle">▼ 開く</span>
       </h2>
@@ -1179,6 +1178,9 @@
       const saved = localStorage.getItem('gemini_api_key');
       if (saved) document.getElementById('api-key').value = saved;
       loadCompanySettings();
+
+      const titleEl = document.getElementById('company-settings-title');
+      if (titleEl) titleEl.addEventListener('click', toggleCompanySettings);
     });
 
     // =============================================
