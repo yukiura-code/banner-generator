@@ -650,15 +650,7 @@
     .ref-image-remove:hover { color: var(--error); border-color: var(--error); }
 
     /* ── Company settings ── */
-    #company-settings-card .card-title {
-      cursor: pointer;
-      user-select: none;
-      justify-content: space-between;
-    }
-
-    #company-settings-card .card-title:hover { color: var(--text); }
-
-    .toggle-icon { font-size: 0.7rem; color: var(--text-muted); margin-left: auto; }
+    .toggle-icon { display: none; }
 
     .btn-settings-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 
@@ -980,11 +972,10 @@
          会社・ブランド設定カード（管理者向け）
     ============================================= -->
     <div class="card" id="company-settings-card">
-      <h2 class="card-title" id="company-settings-title" onclick="toggleCompanySettings()">
+      <h2 class="card-title">
         <span class="icon">⚙️</span> 会社・ブランド設定
-        <span class="toggle-icon" id="company-settings-toggle">▼ 開く</span>
       </h2>
-      <div id="company-settings-body" style="display:none; padding-top:4px;">
+      <div id="company-settings-body" style="padding-top:4px;">
         <p class="input-note" style="margin-bottom:16px;">
           ブランドカラー・デザイン方針を設定すると、すべての生成に自動反映されます。<br>
           「書き出し（JSON）」で設定ファイルを保存し、他のメンバーに配布できます。
@@ -1378,9 +1369,6 @@
           const msg = document.getElementById('settings-saved-msg');
           msg.style.display = 'block';
           setTimeout(() => { msg.style.display = 'none'; }, 2500);
-          if (document.getElementById('company-settings-body').style.display === 'none') {
-            toggleCompanySettings();
-          }
         } catch (_) {
           alert('JSONファイルの形式が正しくありません。');
         }
@@ -1389,13 +1377,6 @@
       event.target.value = '';
     }
 
-    function toggleCompanySettings() {
-      const body   = document.getElementById('company-settings-body');
-      const toggle = document.getElementById('company-settings-toggle');
-      const isOpen = body.style.display !== 'none';
-      body.style.display  = isOpen ? 'none' : 'block';
-      toggle.textContent  = isOpen ? '▼ 開く' : '▲ 閉じる';
-    }
 
     // ── セール期間: カレンダー → テキスト自動生成 ──
     const JP_DAYS = ['日','月','火','水','木','金','土'];
