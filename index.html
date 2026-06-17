@@ -540,6 +540,39 @@
       line-height: 1.6;
     }
 
+    /* ── Date range picker ── */
+    .date-picker-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .date-pick {
+      flex: 1;
+      min-width: 0;
+      color-scheme: dark;
+    }
+
+    .time-pick {
+      width: 110px;
+      flex-shrink: 0;
+      color-scheme: dark;
+    }
+
+    .date-sep {
+      color: var(--text-sub);
+      font-size: 1rem;
+      font-weight: 600;
+      flex-shrink: 0;
+      padding: 0 2px;
+    }
+
+    @media (max-width: 520px) {
+      .date-picker-row { flex-wrap: wrap; }
+      .date-sep { display: none; }
+    }
+
     /* ── Upload zone ── */
     .upload-zone {
       border: 1px dashed var(--border-2);
@@ -859,15 +892,26 @@
 
       <!-- セール期間 -->
       <div class="form-group">
-        <label class="form-label" for="sale-period">
+        <label class="form-label">
           セール期間 <span class="optional">（任意）</span>
         </label>
+        <div class="date-picker-row">
+          <input type="date" class="form-input date-pick" id="sale-start"
+            onchange="updateSalePeriod()" />
+          <span class="date-sep">〜</span>
+          <input type="date" class="form-input date-pick" id="sale-end"
+            onchange="updateSalePeriod()" />
+          <input type="time" class="form-input time-pick" id="sale-end-time"
+            value="23:59" onchange="updateSalePeriod()" />
+        </div>
         <input
           type="text"
           class="form-input"
           id="sale-period"
           placeholder="例: 6/20(木)〜6/22(日) 23:59まで"
+          oninput="clearDatePicker()"
         />
+        <p class="input-note" style="margin-top:6px;">📅 カレンダーで選択すると自動入力（直接入力も可）</p>
       </div>
     </div>
 
@@ -936,7 +980,7 @@
          会社・ブランド設定カード（管理者向け）
     ============================================= -->
     <div class="card" id="company-settings-card">
-      <h2 class="card-title" id="company-settings-title">
+      <h2 class="card-title" id="company-settings-title" onclick="toggleCompanySettings()">
         <span class="icon">⚙️</span> 会社・ブランド設定
         <span class="toggle-icon" id="company-settings-toggle">▼ 開く</span>
       </h2>
@@ -1178,9 +1222,6 @@
       const saved = localStorage.getItem('gemini_api_key');
       if (saved) document.getElementById('api-key').value = saved;
       loadCompanySettings();
-
-      const titleEl = document.getElementById('company-settings-title');
-      if (titleEl) titleEl.addEventListener('click', toggleCompanySettings);
     });
 
     // =============================================
@@ -1354,6 +1395,32 @@
       const isOpen = body.style.display !== 'none';
       body.style.display  = isOpen ? 'none' : 'block';
       toggle.textContent  = isOpen ? '▼ 開く' : '▲ 閉じる';
+    }
+
+    // ── セール期間: カレンダー → テキスト自動生成 ──
+    const JP_DAYS = ['日','月','火','水','木','金','土'];
+
+    function fmtDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr + 'T00:00:00');
+      return `${d.getMonth() + 1}/${d.getDate()}(${JP_DAYS[d.getDay()]})`;
+    }
+
+    function updateSalePeriod() {
+      const start = document.getElementById('sale-start').value;
+      const end   = document.getElementById('sale-end').value;
+      const time  = document.getElementById('sale-end-time').value || '23:59';
+      if (!start && !end) return;
+      let result = '';
+      if (start && end)   result = `${fmtDate(start)}〜${fmtDate(end)} ${time}まで`;
+      else if (start)     result = fmtDate(start);
+      else                result = `〜${fmtDate(end)} ${time}まで`;
+      document.getElementById('sale-period').value = result;
+    }
+
+    function clearDatePicker() {
+      document.getElementById('sale-start').value = '';
+      document.getElementById('sale-end').value   = '';
     }
 
     // =============================================
