@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>楽天・LINE バナー自動生成ツール</title>
+
+  <!-- JSZip: ZIP圧縮ライブラリ（CDN） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- FileSaver.js: ファイル保存ライブラリ（CDN） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    /* =============================================
+       リセット・ベーススタイル
+    ============================================= */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN',
+                   'Hiragino Sans', Meiryo, sans-serif;
+      background: #f4f6f9;
+      color: #333;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* =============================================
+       ヘッダー
+    ============================================= */
+    header {
+      background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+      color: #fff;
+      padding: 24px 32px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      font-size: 0.85rem;
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
+    /* =============================================
+       メインレイアウト
+    ============================================= */
+    main {
+      max-width: 960px;
+      margin: 36px auto;
+      padding: 0 16px 60px;
+    }
+
+    /* =============================================
+       カードコンポーネント
+    ============================================= */
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+      padding: 28px 32px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .icon {
+      font-size: 1.1rem;
+    }
+
+    /* =============================================
+       フォーム要素
+    ============================================= */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 7px;
+      letter-spacing: 0.03em;
+    }
+
+    .form-label .optional {
+      font-weight: 400;
+      color: #aaa;
+      font-size: 0.75rem;
+      margin-left: 4px;
+    }
+
+    .form-input,
+    .form-select {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #dde1e7;
+      border-radius: 9px;
+      font-size: 0.95rem;
+      color: #333;
+      background: #fafbfc;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .form-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23999' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+      cursor: pointer;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+      background: #fff;
+    }
+
+    /* 倍率入力（数値 + 単位） */
+    .rate-input-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rate-input-group .form-input {
+      flex: 1;
+    }
+
+    .rate-unit-label {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1a73e8;
+      min-width: 58px;
+      padding: 11px 10px;
+      background: #eef3fd;
+      border: 1.5px solid #c5d8fa;
+      border-radius: 9px;
+      text-align: center;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    /* APIキー注意書き */
+    .input-note {
+      font-size: 0.76rem;
+      color: #999;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    /* =============================================
+       生成ボタン
+    ============================================= */
+    .btn-generate {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #1a73e8 0%, #1558b0 100%);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 4px 14px rgba(26, 115, 232, 0.35);
+    }
+
+    .btn-generate:hover:not(:disabled) {
+      opacity: 0.93;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(26, 115, 232, 0.4);
+    }
+
+    .btn-generate:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-generate:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* =============================================
+       エラーボックス
+    ============================================= */
+    #error-box {
+      display: none;
+      background: #fff5f5;
+      border: 1.5px solid #f5c6c6;
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: #c0392b;
+      font-size: 0.88rem;
+      margin-top: 18px;
+      line-height: 1.6;
+    }
+
+    #error-box::before {
+      content: '⚠ ';
+      font-weight: 700;
+    }
+
+    /* =============================================
+       ローディングエリア
+    ============================================= */
+    #loading {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    /* スピナー */
+    .spinner {
+      width: 52px;
+      height: 52px;
+      border: 5px solid #e8eef8;
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #status-msg {
+      font-size: 0.95rem;
+      color: #555;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    /* ステップリスト */
+    .step-list {
+      list-style: none;
+      display: inline-block;
+      text-align: left;
+    }
+
+    .step-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      font-size: 0.88rem;
+      color: #aaa;
+      transition: color 0.3s;
+    }
+
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #e8eef8;
+      color: #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .step-list li.active {
+      color: #1a73e8;
+      font-weight: 600;
+    }
+
+    .step-list li.active .step-num {
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    .step-list li.done {
+      color: #2e7d32;
+    }
+
+    .step-list li.done .step-num {
+      background: #2e7d32;
+      color: #fff;
+    }
+
+    /* =============================================
+       プレビューセクション
+    ============================================= */
+    #preview-section {
+      display: none;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    @media (max-width: 640px) {
+      .preview-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .preview-item-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .size-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #eef3fd;
+      color: #1a73e8;
+      padding: 2px 9px;
+      border-radius: 20px;
+      border: 1px solid #c5d8fa;
+    }
+
+    .platform-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 9px;
+      border-radius: 20px;
+    }
+
+    .badge-rakuten {
+      background: #fff0f0;
+      color: #bf0000;
+      border: 1px solid #fbbcbc;
+    }
+
+    .badge-line {
+      background: #f0fff4;
+      color: #00b300;
+      border: 1px solid #9de0a0;
+    }
+
+    /* プレビュー画像ラッパー */
+    .preview-img-wrap {
+      width: 100%;
+      background: repeating-conic-gradient(#e8e8e8 0% 25%, #f5f5f5 0% 50%)
+                  0 0 / 20px 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid #e0e0e0;
+      min-height: 80px;
+    }
+
+    .preview-img-wrap img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* ダウンロードボタン（個別） */
+    .btn-download-single {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      background: #fff;
+      border: 1.5px solid #1a73e8;
+      color: #1a73e8;
+      border-radius: 9px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s, color 0.2s;
+      letter-spacing: 0.03em;
+    }
+
+    .btn-download-single:hover {
+      background: #eef3fd;
+    }
+
+    /* ZIPダウンロードボタン */
+    .btn-zip {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: opacity 0.2s, transform 0.15s;
+      box-shadow: 0 4px 14px rgba(46, 125, 50, 0.3);
+    }
+
+    .btn-zip:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .zip-note {
+      font-size: 0.82rem;
+      color: #777;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    /* =============================================
+       追加指示・フィードバック
+    ============================================= */
+    .form-textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #dde1e7;
+      border-radius: 9px;
+      font-size: 0.92rem;
+      color: #333;
+      background: #fafbfc;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.6;
+    }
+
+    .form-textarea:focus {
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+      background: #fff;
+    }
+
+    /* =============================================
+       会社設定カード
+    ============================================= */
+    #company-settings-card {
+      border: 2px solid #e8eef8;
+    }
+
+    #company-settings-card .card-title {
+      cursor: pointer;
+      user-select: none;
+      justify-content: space-between;
+    }
+
+    #company-settings-card .card-title:hover {
+      color: #1a73e8;
+    }
+
+    .toggle-icon {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-left: auto;
+    }
+
+    .btn-settings-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-settings-save {
+      padding: 9px 20px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-settings-save:hover { opacity: 0.88; }
+
+    .btn-settings-sub {
+      padding: 9px 16px;
+      background: #fff;
+      color: #555;
+      border: 1.5px solid #ccc;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-settings-sub:hover { background: #f5f5f5; }
+
+    .settings-saved-msg {
+      margin-top: 10px;
+      font-size: 0.82rem;
+      color: #2e7d32;
+      font-weight: 600;
+    }
+
+    /* =============================================
+       フィードバック再生成カード
+    ============================================= */
+    #feedback-card {
+      border: 2px solid #e8f5e9;
+      background: #fafffe;
+    }
+
+    #feedback-card .card-title {
+      color: #2e7d32;
+      border-bottom-color: #c8e6c9;
+    }
+
+    .btn-regenerate {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #e65100 0%, #bf360c 100%);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      transition: opacity 0.2s, transform 0.15s;
+      box-shadow: 0 4px 14px rgba(230, 81, 0, 0.3);
+      margin-top: 12px;
+    }
+
+    .btn-regenerate:hover:not(:disabled) {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .btn-regenerate:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* =============================================
+       テストモード
+    ============================================= */
+    .test-mode-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #444;
+      cursor: pointer;
+    }
+
+    .test-mode-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #f09000;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    #test-mode-card {
+      border: 2px dashed #f0c060;
+      background: #fffdf0;
+    }
+
+    #test-mode-card .card-title {
+      color: #a06000;
+      border-bottom-color: #f0e0a0;
+    }
+
+    /* =============================================
+       フッター
+    ============================================= */
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.78rem;
+      color: #bbb;
+      border-top: 1px solid #eee;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =============================================
+       ヘッダー
+  ============================================= -->
+  <header>
+    <h1>楽天・LINE バナー自動生成ツール</h1>
+    <p>Gemini API を使用して、楽天・LINE 向けの販促バナーを自動生成します</p>
+  </header>
+
+  <main>
+
+    <!-- =============================================
+         フォームカード: 商品情報入力
+    ============================================= -->
+    <div class="card">
+      <h2 class="card-title">
+        <span class="icon">📝</span> バナー情報入力
+      </h2>
+
+      <!-- 商品名 -->
+      <div class="form-group">
+        <label class="form-label" for="product-name">
+          商品名 <span class="optional">（任意）</span>
+        </label>
+        <input
+          type="text"
+          class="form-input"
+          id="product-name"
+          placeholder="例: プレミアムコーヒーセット"
+        />
+      </div>
+
+      <div class="form-row">
+        <!-- セール種別 -->
+        <div class="form-group">
+          <label class="form-label" for="sale-type">
+            セール種別 <span class="optional">（任意）</span>
+          </label>
+          <select
+            class="form-select"
+            id="sale-type"
+            onchange="updateRateUnit()"
+          >
+            <option value="point">ポイントアップ</option>
+            <option value="discount">割引</option>
+          </select>
+        </div>
+
+        <!-- 倍率 / 割引率 -->
+        <div class="form-group">
+          <label class="form-label" for="sale-rate" id="rate-label">
+            倍率 <span class="optional">（任意）</span>
+          </label>
+          <div class="rate-input-group">
+            <input
+              type="number"
+              class="form-input"
+              id="sale-rate"
+              placeholder="例: 10"
+              min="1"
+              step="0.5"
+            />
+            <span class="rate-unit-label" id="rate-unit">倍</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- セール期間 -->
+      <div class="form-group">
+        <label class="form-label" for="sale-period">
+          セール期間 <span class="optional">（任意）</span>
+        </label>
+        <input
+          type="text"
+          class="form-input"
+          id="sale-period"
+          placeholder="例: 6/20(木)〜6/22(日) 23:59まで"
+        />
+      </div>
+    </div>
+
+    <!-- =============================================
+         追加デザイン指示カード
+    ============================================= -->
+    <div class="card">
+      <h2 class="card-title">
+        <span class="icon">✏️</span> 追加デザイン指示
+        <span class="optional" style="font-size:0.78rem;font-weight:400;color:#aaa;margin-left:6px;">任意</span>
+      </h2>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="extra-instructions">
+          このバナーへの追加指示 <span class="optional">（任意）</span>
+        </label>
+        <textarea
+          class="form-textarea"
+          id="extra-instructions"
+          rows="3"
+          placeholder="例: 赤と白を基調にしてください&#10;例: シンプルで高級感のあるデザインで&#10;例: 夏らしいさわやかなイメージで"
+        ></textarea>
+        <p class="input-note" style="margin-top:6px;">
+          ※ 生成のたびに変えられる自由入力欄です。会社共通の設定は下の「会社・ブランド設定」で行ってください。
+        </p>
+      </div>
+    </div>
+
+    <!-- =============================================
+         会社・ブランド設定カード（管理者向け）
+    ============================================= -->
+    <div class="card" id="company-settings-card">
+      <h2 class="card-title" onclick="toggleCompanySettings()">
+        <span class="icon">⚙️</span> 会社・ブランド設定
+        <span class="toggle-icon" id="company-settings-toggle">▼ 開く</span>
+      </h2>
+      <div id="company-settings-body" style="display:none; padding-top:4px;">
+        <p class="input-note" style="margin-bottom:16px;">
+          ブランドカラー・デザイン方針を設定すると、すべての生成に自動反映されます。<br>
+          「書き出し（JSON）」で設定ファイルを保存し、他のメンバーに配布できます。
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cs-brand-name">ブランド名・会社名</label>
+            <input type="text" class="form-input" id="cs-brand-name"
+              placeholder="例: ASGR株式会社" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cs-brand-colors">ブランドカラー</label>
+            <input type="text" class="form-input" id="cs-brand-colors"
+              placeholder="例: ブルー（#003DA5）とホワイト" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cs-design-style">デザインスタイル</label>
+          <select class="form-select" id="cs-design-style">
+            <option value="">指定なし</option>
+            <option value="professional">プロフェッショナル・信頼感</option>
+            <option value="pop">ポップ・にぎやか</option>
+            <option value="simple">シンプル・ミニマル</option>
+            <option value="luxury">高級感・ラグジュアリー</option>
+            <option value="cute">かわいい・やさしい</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cs-common-instructions">共通追加指示（全生成に適用）</label>
+          <textarea class="form-textarea" id="cs-common-instructions" rows="3"
+            placeholder="例: ロゴスペースを左上に確保してください&#10;例: 価格表示は必ず大きく目立たせてください"></textarea>
+        </div>
+        <div class="btn-settings-row">
+          <button class="btn-settings-save" onclick="saveCompanySettings()">設定を保存</button>
+          <button class="btn-settings-sub" onclick="exportSettings()">書き出し（JSON）</button>
+          <button class="btn-settings-sub" onclick="document.getElementById('settings-import-file').click()">読み込み（JSON）</button>
+          <input type="file" id="settings-import-file" accept=".json" style="display:none"
+            onchange="importSettings(event)" />
+        </div>
+        <p class="settings-saved-msg" id="settings-saved-msg" style="display:none;">✓ 設定を保存しました</p>
+      </div>
+    </div>
+
+    <!-- =============================================
+         APIキーカード
+    ============================================= -->
+    <div class="card">
+      <h2 class="card-title">
+        <span class="icon">🔑</span> API 設定
+      </h2>
+      <div class="form-group">
+        <label class="form-label" for="api-key">Gemini API キー</label>
+        <input
+          type="password"
+          class="form-input"
+          id="api-key"
+          placeholder="AIzaSy..."
+          oninput="saveApiKey()"
+          autocomplete="off"
+        />
+        <p class="input-note">
+          ※ APIキーはお使いのブラウザのローカルストレージに保存されます。外部サーバーへの送信はありません。<br>
+          ※ Google AI Studio（<code>aistudio.google.com</code>）から取得できます。
+        </p>
+      </div>
+    </div>
+
+    <!-- テストモード -->
+    <div class="card" id="test-mode-card">
+      <h2 class="card-title">
+        <span class="icon">🧪</span> テストモード
+      </h2>
+      <label class="test-mode-label">
+        <input type="checkbox" id="test-mode" onchange="toggleTestMode()" />
+        テストモードで生成する（APIキー不要・Pollinations.ai 使用・無料）
+      </label>
+      <p class="input-note" style="margin-top:8px;">
+        ※ Gemini API の代わりに無料の Pollinations.ai で画像生成します。動作確認・レイアウト確認に使用できます。<br>
+        ※ 本番利用には Gemini API キー（課金有効）が必要です。
+      </p>
+    </div>
+
+    <!-- 生成ボタン -->
+    <button
+      class="btn-generate"
+      id="btn-generate"
+      onclick="generateBanners()"
+    >
+      バナーを生成する
+    </button>
+
+    <!-- エラーボックス -->
+    <div id="error-box"></div>
+
+    <!-- =============================================
+         ローディングインジケーター
+    ============================================= -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <p id="status-msg">準備中...</p>
+      <ul class="step-list" id="step-list">
+        <li id="step-1">
+          <span class="step-num">1</span>
+          楽天用バナーを生成中（4:1 比率）
+        </li>
+        <li id="step-2">
+          <span class="step-num">2</span>
+          LINE 用バナーを生成中（16:9 比率）
+        </li>
+        <li id="step-3">
+          <span class="step-num">3</span>
+          画像をリサイズ中（Canvas API）
+        </li>
+      </ul>
+    </div>
+
+    <!-- =============================================
+         プレビューセクション
+    ============================================= -->
+    <div id="preview-section">
+
+      <!-- 画像プレビューカード -->
+      <div class="card">
+        <h2 class="card-title">
+          <span class="icon">🖼</span> 生成結果プレビュー
+        </h2>
+        <div class="preview-grid">
+
+          <!-- 楽天バナー -->
+          <div>
+            <div class="preview-item-title">
+              <span class="platform-badge badge-rakuten">楽天</span>
+              楽天用バナー
+              <span class="size-badge">1080 × 270 px</span>
+            </div>
+            <div class="preview-img-wrap">
+              <img
+                id="preview-rakuten"
+                src=""
+                alt="楽天バナープレビュー"
+              />
+            </div>
+            <button
+              class="btn-download-single"
+              onclick="downloadSingle('rakuten')"
+            >
+              ↓ 楽天用バナーをダウンロード
+            </button>
+          </div>
+
+          <!-- LINEバナー -->
+          <div>
+            <div class="preview-item-title">
+              <span class="platform-badge badge-line">LINE</span>
+              LINE 用バナー
+              <span class="size-badge">1040 × 585 px</span>
+            </div>
+            <div class="preview-img-wrap">
+              <img
+                id="preview-line"
+                src=""
+                alt="LINEバナープレビュー"
+              />
+            </div>
+            <button
+              class="btn-download-single"
+              onclick="downloadSingle('line')"
+            >
+              ↓ LINE 用バナーをダウンロード
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ZIP一括ダウンロードカード -->
+      <div class="card">
+        <h2 class="card-title">
+          <span class="icon">📦</span> ZIP 一括ダウンロード
+        </h2>
+        <p class="zip-note">
+          楽天用・LINE 用の 2 枚のバナーを ZIP ファイルにまとめてダウンロードできます。
+        </p>
+        <button class="btn-zip" onclick="downloadZip()">
+          ↓ ZIP でまとめてダウンロード
+        </button>
+      </div>
+
+      <!-- フィードバック再生成カード -->
+      <div class="card" id="feedback-card">
+        <h2 class="card-title">
+          <span class="icon">💬</span> フィードバックで再生成
+        </h2>
+        <p class="zip-note">
+          生成結果を見て「もっとこうしてほしい」という指示を入力すると、その内容を反映して再生成します。
+        </p>
+        <div class="form-group" style="margin-bottom:0;">
+          <textarea
+            class="form-textarea"
+            id="feedback-text"
+            rows="3"
+            placeholder="例: もっと派手にしてください&#10;例: 文字をもっと大きくして&#10;例: 背景を青系に変更して&#10;例: セールの数字をより目立たせて"
+          ></textarea>
+        </div>
+        <button class="btn-regenerate" id="btn-regenerate" onclick="regenerateWithFeedback()">
+          この指示で再生成する
+        </button>
+      </div>
+
+    </div><!-- /#preview-section -->
+
+  </main>
+
+  <footer>
+    Powered by Gemini API · 画像生成: gemini-3-pro-image · リサイズ: Canvas API
+  </footer>
+
+  <!-- =============================================
+       JavaScript（メインロジック）
+  ============================================= -->
+  <script>
+    'use strict';
+
+    // =============================================
+    // グローバル変数: 生成済み画像の DataURL を保持
+    // =============================================
+    let rakutenDataUrl = null;  // 楽天用バナー（1080×270）
+    let lineDataUrl    = null;  // LINE用バナー（1040×585）
+    let currentProductName = ''; // ZIP ファイル名に使用
+
+    // =============================================
+    // 初期化: ページ読み込み時に localStorage からAPIキーを復元
+    // =============================================
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('gemini_api_key');
+      if (saved) document.getElementById('api-key').value = saved;
+      loadCompanySettings();
+    });
+
+    // =============================================
+    // 会社・ブランド設定の管理
+    // =============================================
+    function loadCompanySettings() {
+      const saved = localStorage.getItem('banner_company_settings');
+      if (!saved) return;
+      try {
+        const s = JSON.parse(saved);
+        if (s.brandName)          document.getElementById('cs-brand-name').value          = s.brandName;
+        if (s.brandColors)        document.getElementById('cs-brand-colors').value        = s.brandColors;
+        if (s.designStyle)        document.getElementById('cs-design-style').value        = s.designStyle;
+        if (s.commonInstructions) document.getElementById('cs-common-instructions').value = s.commonInstructions;
+      } catch (_) {}
+    }
+
+    function saveCompanySettings() {
+      const s = {
+        brandName:          document.getElementById('cs-brand-name').value.trim(),
+        brandColors:        document.getElementById('cs-brand-colors').value.trim(),
+        designStyle:        document.getElementById('cs-design-style').value,
+        commonInstructions: document.getElementById('cs-common-instructions').value.trim(),
+      };
+      localStorage.setItem('banner_company_settings', JSON.stringify(s));
+      const msg = document.getElementById('settings-saved-msg');
+      msg.style.display = 'block';
+      setTimeout(() => { msg.style.display = 'none'; }, 2500);
+    }
+
+    function exportSettings() {
+      const data = localStorage.getItem('banner_company_settings') || '{}';
+      const blob = new Blob([data], { type: 'application/json' });
+      saveAs(blob, 'banner_company_settings.json');
+    }
+
+    function importSettings(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          JSON.parse(e.target.result);
+          localStorage.setItem('banner_company_settings', e.target.result);
+          loadCompanySettings();
+          const msg = document.getElementById('settings-saved-msg');
+          msg.style.display = 'block';
+          setTimeout(() => { msg.style.display = 'none'; }, 2500);
+          if (document.getElementById('company-settings-body').style.display === 'none') {
+            toggleCompanySettings();
+          }
+        } catch (_) {
+          alert('JSONファイルの形式が正しくありません。');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function toggleCompanySettings() {
+      const body   = document.getElementById('company-settings-body');
+      const toggle = document.getElementById('company-settings-toggle');
+      const isOpen = body.style.display !== 'none';
+      body.style.display  = isOpen ? 'none' : 'block';
+      toggle.textContent  = isOpen ? '▼ 開く' : '▲ 閉じる';
+    }
+
+    // =============================================
+    // プロンプトへの付加情報を構築
+    // 会社設定 + 追加指示 + フィードバック をまとめる
+    // =============================================
+    function buildPromptSuffix(feedbackText = '') {
+      const lines = [];
+      const saved = localStorage.getItem('banner_company_settings');
+      if (saved) {
+        try {
+          const s = JSON.parse(saved);
+          const styleMap = {
+            professional: 'Professional and trustworthy',
+            pop:          'Pop and lively',
+            simple:       'Simple and minimal',
+            luxury:       'Luxury and high-end',
+            cute:         'Cute and friendly',
+          };
+          if (s.brandName)          lines.push(`Brand/Company: ${s.brandName}`);
+          if (s.brandColors)        lines.push(`Brand colors: ${s.brandColors}`);
+          if (s.designStyle && styleMap[s.designStyle]) lines.push(`Design style: ${styleMap[s.designStyle]}`);
+          if (s.commonInstructions) lines.push(`Company requirements: ${s.commonInstructions}`);
+        } catch (_) {}
+      }
+      const extra = document.getElementById('extra-instructions').value.trim();
+      if (extra)        lines.push(`Additional instructions: ${extra}`);
+      if (feedbackText) lines.push(`Improvement feedback from user: ${feedbackText}`);
+      return lines.length > 0 ? '\n\n' + lines.join('\n') : '';
+    }
+
+    // =============================================
+    // フィードバックで再生成
+    // =============================================
+    async function regenerateWithFeedback() {
+      const feedbackText = document.getElementById('feedback-text').value.trim();
+      if (!feedbackText) {
+        showError('フィードバック内容を入力してください。');
+        return;
+      }
+      document.getElementById('feedback-text').value = '';
+      await generateBanners(feedbackText);
+    }
+
+    // =============================================
+    // テストモード切替（APIキー欄の表示/非表示）
+    // =============================================
+    function toggleTestMode() {
+      const isTest = document.getElementById('test-mode').checked;
+      const apiCard = document.querySelector('.card:has(#api-key)');
+      if (apiCard) apiCard.style.opacity = isTest ? '0.4' : '1';
+    }
+
+    // =============================================
+    // テスト用画像生成（Pollinations.ai・無料・APIキー不要）
+    // @param {string} prompt  - 生成プロンプト
+    // @param {number} width   - 生成幅 (px)
+    // @param {number} height  - 生成高さ (px)
+    // @returns {{ mimeType: string, data: string }}
+    // =============================================
+    async function callTestImageAPI(prompt, width, height) {
+      const url =
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+        `?width=${width}&height=${height}&nologo=true&seed=${Date.now()}`;
+
+      let response;
+      try {
+        response = await fetch(url);
+      } catch (_) {
+        throw new Error('ネットワークエラーが発生しました。インターネット接続を確認してください。');
+      }
+      if (!response.ok) {
+        throw new Error(`テスト画像の取得に失敗しました (HTTP ${response.status})`);
+      }
+
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve({
+          mimeType: blob.type || 'image/jpeg',
+          data: reader.result.split(',')[1]
+        });
+        reader.onerror = () => reject(new Error('画像データの読み込みに失敗しました'));
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // =============================================
+    // APIキーを localStorage に保存（入力のたびに実行）
+    // =============================================
+    function saveApiKey() {
+      const key = document.getElementById('api-key').value.trim();
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+      } else {
+        localStorage.removeItem('gemini_api_key');
+      }
+    }
+
+    // =============================================
+    // セール種別に応じて倍率/割引率のラベルを切り替え
+    // =============================================
+    function updateRateUnit() {
+      const saleType  = document.getElementById('sale-type').value;
+      const unitLabel = document.getElementById('rate-unit');
+      const rateLabel = document.getElementById('rate-label');
+      const rateInput = document.getElementById('sale-rate');
+
+      if (saleType === 'point') {
+        unitLabel.textContent = '倍';
+        rateLabel.innerHTML   = '倍率 <span class="optional">（任意）</span>';
+        rateInput.placeholder = '例: 10';
+        rateInput.step        = '0.5';
+      } else {
+        unitLabel.textContent = '% OFF';
+        rateLabel.innerHTML   = '割引率 <span class="optional">（任意）</span>';
+        rateInput.placeholder = '例: 30';
+        rateInput.step        = '1';
+      }
+    }
+
+    // =============================================
+    // ステップインジケーターを更新
+    // stepNum: 1〜3 の現在ステップ番号
+    // status : 'active'（処理中）| 'done'（完了）
+    // =============================================
+    function setStep(stepNum, status) {
+      // まず全ステップのクラスをリセット
+      for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById(`step-${i}`);
+        el.classList.remove('active', 'done');
+      }
+      // 現在ステップより前のものをすべて「done」に
+      for (let i = 1; i < stepNum; i++) {
+        document.getElementById(`step-${i}`).classList.add('done');
+      }
+      // 現在ステップを指定ステータスに
+      if (stepNum >= 1 && stepNum <= 3) {
+        document.getElementById(`step-${stepNum}`).classList.add(status);
+      }
+    }
+
+    // =============================================
+    // エラー表示・非表示
+    // =============================================
+    function showError(msg) {
+      const box = document.getElementById('error-box');
+      box.textContent = msg;
+      box.style.display = 'block';
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function hideError() {
+      const box = document.getElementById('error-box');
+      box.textContent = '';
+      box.style.display = 'none';
+    }
+
+    // =============================================
+    // Gemini API 呼び出し
+    // ブラウザから直接呼び出すことで CORS を回避
+    // エンドポイント: generativelanguage.googleapis.com
+    // モデル: gemini-2.0-flash-preview-image-generation
+    //
+    // @param {string} prompt - 生成プロンプト
+    // @param {string} apiKey - Gemini API キー
+    // @returns {{ mimeType: string, data: string }} - base64 画像データ
+    // =============================================
+    async function callGeminiImageAPI(prompt, apiKey) {
+      const model    = 'gemini-3-pro-image';
+      const endpoint =
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      const requestBody = {
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          // TEXT も含めることで応答の安定性を高める
+          responseModalities: ['IMAGE', 'TEXT']
+        }
+      };
+
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(requestBody)
+        });
+      } catch (networkErr) {
+        throw new Error(
+          'ネットワークエラーが発生しました。インターネット接続を確認してください。'
+        );
+      }
+
+      // HTTPエラー処理
+      if (!response.ok) {
+        let errMsg = `APIエラー (HTTP ${response.status})`;
+        try {
+          const errData = await response.json();
+          if (errData?.error?.message) {
+            errMsg = errData.error.message;
+            // よくあるエラーを日本語に変換
+            if (errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key not valid')) {
+              errMsg = 'APIキーが無効です。正しい Gemini API キーを入力してください。';
+            } else if (errMsg.includes('QUOTA_EXCEEDED') || response.status === 429) {
+              errMsg = 'API クォータを超過しました。しばらく待ってから再試行してください。';
+            } else if (errMsg.includes('SAFETY')) {
+              errMsg = 'セーフティフィルターにより画像生成がブロックされました。プロンプトを変更してください。';
+            }
+          }
+        } catch (_) { /* JSON パース失敗時はデフォルトメッセージを使用 */ }
+        throw new Error(errMsg);
+      }
+
+      const data = await response.json();
+
+      // レスポンスから画像パートを抽出
+      const parts = data?.candidates?.[0]?.content?.parts;
+      if (!parts || !Array.isArray(parts)) {
+        // finish_reason を確認
+        const finishReason = data?.candidates?.[0]?.finishReason;
+        if (finishReason === 'SAFETY') {
+          throw new Error('セーフティフィルターにより画像生成がブロックされました。');
+        }
+        throw new Error('APIレスポンスに有効なデータが含まれていません。');
+      }
+
+      // inlineData（画像）を持つパートを探す
+      const imagePart = parts.find(
+        (p) => p.inlineData && typeof p.inlineData.data === 'string'
+      );
+      if (!imagePart) {
+        throw new Error(
+          '画像の生成に失敗しました。プロンプトを変更するか、しばらく待ってから再試行してください。'
+        );
+      }
+
+      return {
+        mimeType: imagePart.inlineData.mimeType || 'image/png',
+        data:     imagePart.inlineData.data  // base64 エンコード済み
+      };
+    }
+
+    // =============================================
+    // Canvas API を使って画像をリサイズ
+    // 元画像のアスペクト比を保ちつつ目標サイズに収め、
+    // 余白を白で塗りつぶす（letterbox 方式）
+    //
+    // @param {string} base64Data - base64 画像データ
+    // @param {string} mimeType   - 画像の MIME タイプ
+    // @param {number} targetW    - 目標幅 (px)
+    // @param {number} targetH    - 目標高さ (px)
+    // @returns {Promise<string>} - リサイズ後の DataURL（PNG）
+    // =============================================
+    function resizeImage(base64Data, mimeType, targetW, targetH) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width  = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+
+          // 背景を白で塗りつぶす（透過 PNG 対策）
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, targetW, targetH);
+
+          // アスペクト比を保ちながら目標サイズに収まるよう計算（contain 相当）
+          const srcRatio = img.width  / img.height;
+          const dstRatio = targetW   / targetH;
+
+          let drawW, drawH, offsetX, offsetY;
+          if (srcRatio > dstRatio) {
+            // 元画像の方が横長 → 幅に合わせて縮小
+            drawW   = targetW;
+            drawH   = targetW / srcRatio;
+            offsetX = 0;
+            offsetY = (targetH - drawH) / 2;
+          } else {
+            // 元画像の方が縦長（または同比率）→ 高さに合わせて縮小
+            drawH   = targetH;
+            drawW   = targetH * srcRatio;
+            offsetX = (targetW - drawW) / 2;
+            offsetY = 0;
+          }
+
+          // 高品質なリサイズのため imageSmoothingQuality を設定
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+
+          resolve(canvas.toDataURL('image/png'));
+        };
+
+        img.onerror = () => {
+          reject(new Error('生成画像の読み込みに失敗しました。'));
+        };
+
+        img.src = `data:${mimeType};base64,${base64Data}`;
+      });
+    }
+
+    // =============================================
+    // メイン処理: バナー生成
+    // フォーム入力 → Gemini API (×2) → Canvas リサイズ → プレビュー表示
+    // =============================================
+    async function generateBanners(feedbackText = '') {
+      hideError();
+
+      // --- フォーム入力値の取得 ---
+      const productName  = document.getElementById('product-name').value.trim();
+      const saleType     = document.getElementById('sale-type').value;
+      const saleRate     = document.getElementById('sale-rate').value.trim();
+      const salePeriod   = document.getElementById('sale-period').value.trim();
+      const apiKey       = document.getElementById('api-key').value.trim();
+
+      const isTestMode = document.getElementById('test-mode').checked;
+
+      // テストモード以外はAPIキー必須
+      if (!isTestMode && !apiKey) {
+        showError('Gemini API キーを入力してください。Google AI Studio から取得できます。');
+        document.getElementById('api-key').focus();
+        return;
+      }
+
+      // セール情報をプロンプト用テキストに変換
+      const saleTypeText =
+        saleType === 'point'
+          ? `ポイントアップ（${saleRate ? saleRate + '倍' : '詳細未設定'}）`
+          : `割引（${saleRate ? saleRate + '% OFF' : '詳細未設定'}）`;
+
+      // ZIP ファイル名用に商品名を保持
+      currentProductName = productName || 'product';
+
+      // --- UI: ローディング開始 ---
+      document.getElementById('btn-generate').disabled   = true;
+      const btnRegen = document.getElementById('btn-regenerate');
+      if (btnRegen) btnRegen.disabled = true;
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('preview-section').style.display = 'none';
+      rakutenDataUrl = null;
+      lineDataUrl    = null;
+
+      try {
+        // =============================================
+        // STEP 1: 楽天用バナー生成（4:1 比率）
+        // =============================================
+        setStep(1, 'active');
+        document.getElementById('status-msg').textContent =
+          '楽天用バナーを生成中... (1/2)';
+
+        const promptSuffix = buildPromptSuffix(feedbackText);
+
+        const saleLabel = saleType === 'point'
+          ? `${saleRate || '?'}倍ポイント`
+          : `${saleRate || '?'}%OFF`;
+
+        const rakutenPrompt = `You are a professional Japanese e-commerce banner designer. Create a HIGH-QUALITY, PHOTOREALISTIC promotional banner image strictly following these specifications.
+
+━━ BANNER SPECS ━━
+Format: Horizontal wide banner for Rakuten marketplace (4:1 aspect ratio)
+Output size: 1080×270px
+
+━━ TEXT TO RENDER (CRITICAL — render every character EXACTLY and LEGIBLY) ━━
+① Product name  : 「${productName || '商品名'}」  ← must appear, large and prominent
+② Sale highlight: 「${saleLabel}」  ← LARGEST element, bold, stands out the most
+③ Sale period   : 「${salePeriod || '開催期間'}」  ← smaller, clearly readable
+
+ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, blur, or omit any character.
+
+━━ LAYOUT ━━
+- Left zone   : product name ① large
+- Center zone : sale highlight ② very large, eye-catching
+- Right zone  : decorative element or badge
+- Bottom strip: sale period ③ in a contrasting color strip
+
+━━ VISUAL STYLE ━━
+- High-contrast, vibrant colors — professional Japanese retail aesthetic (Rakuten style)
+- Clean gradient or solid background with bold accent shapes
+- Decorative elements: sale tag, ribbon, star burst, or geometric accent
+- Typography: clean sans-serif, modern, no decorative scripts${promptSuffix}`;
+
+        const rakutenRaw = isTestMode
+          ? await callTestImageAPI(rakutenPrompt, 1080, 270)
+          : await callGeminiImageAPI(rakutenPrompt, apiKey);
+
+        // =============================================
+        // STEP 2: LINE用バナー生成（16:9 比率）
+        // =============================================
+        setStep(2, 'active');
+        document.getElementById('status-msg').textContent =
+          'LINE 用バナーを生成中... (2/2)';
+
+        const linePrompt = `You are a professional Japanese e-commerce banner designer. Create a HIGH-QUALITY, PHOTOREALISTIC promotional banner image strictly following these specifications.
+
+━━ BANNER SPECS ━━
+Format: LINE Rich Message / LINE VOOM banner (16:9 aspect ratio)
+Output size: 1040×585px
+
+━━ TEXT TO RENDER (CRITICAL — render every character EXACTLY and LEGIBLY) ━━
+① Product name  : 「${productName || '商品名'}」  ← must appear, large and prominent
+② Sale highlight: 「${saleLabel}」  ← LARGEST element, bold, stands out the most
+③ Sale period   : 「${salePeriod || '開催期間'}」  ← smaller, clearly readable
+
+ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, blur, or omit any character.
+
+━━ LAYOUT ━━
+- Top section  : product name ① large, centered or left-aligned
+- Center focus : sale highlight ② very large, dominant — this is the hero element
+- Bottom area  : sale period ③ in a banner or strip
+- Visual space : room for decorative graphic element on one side
+
+━━ VISUAL STYLE ━━
+- SAME overall color scheme and brand feel as the companion Rakuten 4:1 banner — adapted for 16:9
+- High-contrast, vibrant colors — professional Japanese retail aesthetic
+- Decorative elements: sale tag, ribbon, star burst, or geometric accent
+- Typography: clean sans-serif, modern, no decorative scripts${promptSuffix}`;
+
+        const lineRaw = isTestMode
+          ? await callTestImageAPI(linePrompt, 1040, 585)
+          : await callGeminiImageAPI(linePrompt, apiKey);
+
+        // =============================================
+        // STEP 3: Canvas API でリサイズ
+        // 楽天: 1080×270px / LINE: 1040×585px
+        // =============================================
+        setStep(3, 'active');
+        document.getElementById('status-msg').textContent =
+          '画像をリサイズ中...';
+
+        rakutenDataUrl = await resizeImage(
+          rakutenRaw.data, rakutenRaw.mimeType,
+          1080, 270   // 楽天 4:1
+        );
+        lineDataUrl = await resizeImage(
+          lineRaw.data, lineRaw.mimeType,
+          1040, 585   // LINE ≒16:9
+        );
+
+        setStep(3, 'done');
+
+        // =============================================
+        // プレビュー表示
+        // =============================================
+        document.getElementById('preview-rakuten').src = rakutenDataUrl;
+        document.getElementById('preview-line').src    = lineDataUrl;
+        document.getElementById('preview-section').style.display = 'block';
+        document.getElementById('loading').style.display = 'none';
+
+        // プレビュー位置にスムーズスクロール
+        setTimeout(() => {
+          document.getElementById('preview-section').scrollIntoView({
+            behavior: 'smooth', block: 'start'
+          });
+        }, 100);
+
+      } catch (err) {
+        // エラー処理: ローディングを非表示にしてエラーメッセージを表示
+        document.getElementById('loading').style.display = 'none';
+        showError(`バナーの生成に失敗しました: ${err.message}`);
+        console.error('[BannerGenerator] Error:', err);
+      } finally {
+        document.getElementById('btn-generate').disabled = false;
+        const btnRegenFin = document.getElementById('btn-regenerate');
+        if (btnRegenFin) btnRegenFin.disabled = false;
+      }
+    }
+
+    // =============================================
+    // 個別ダウンロード
+    // @param {'rakuten'|'line'} type - ダウンロード対象
+    // =============================================
+    function downloadSingle(type) {
+      let dataUrl  = null;
+      let filename = '';
+
+      if (type === 'rakuten') {
+        dataUrl  = rakutenDataUrl;
+        filename = 'banner_rakuten_1080x270.png';
+      } else if (type === 'line') {
+        dataUrl  = lineDataUrl;
+        filename = 'banner_line_1040x585.png';
+      }
+
+      if (!dataUrl) {
+        showError('ダウンロード可能な画像がありません。先にバナーを生成してください。');
+        return;
+      }
+
+      // <a> タグのクリックでダウンロード
+      const link      = document.createElement('a');
+      link.href       = dataUrl;
+      link.download   = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // =============================================
+    // ZIP 一括ダウンロード（JSZip + FileSaver.js）
+    // 両バナーを ZIP に格納してダウンロード
+    // =============================================
+    async function downloadZip() {
+      if (!rakutenDataUrl || !lineDataUrl) {
+        showError('ZIP を作成する画像がありません。先にバナーを生成してください。');
+        return;
+      }
+
+      try {
+        const zip = new JSZip();
+
+        // DataURL の "data:image/png;base64," プレフィックスを除いて base64 のみ取得
+        const rakutenBase64 = rakutenDataUrl.split(',')[1];
+        const lineBase64    = lineDataUrl.split(',')[1];
+
+        // ZIP にファイルを追加
+        zip.file('banner_rakuten_1080x270.png', rakutenBase64, { base64: true });
+        zip.file('banner_line_1040x585.png',    lineBase64,    { base64: true });
+
+        // ZIP を Blob として生成
+        const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+
+        // ファイル名: banners_{商品名}.zip
+        // 特殊文字をアンダースコアに置換（日本語は保持）
+        const safeName = currentProductName
+          .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+          .trim() || 'product';
+
+        saveAs(blob, `banners_${safeName}.zip`);
+
+      } catch (err) {
+        showError(`ZIP の作成に失敗しました: ${err.message}`);
+        console.error('[BannerGenerator] ZIP Error:', err);
+      }
+    }
+  </script>
+
+</body>
+</html>
