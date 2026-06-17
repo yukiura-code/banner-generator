@@ -1795,7 +1795,7 @@
         // =============================================
         setStep(1, 'active');
         document.getElementById('status-msg').textContent =
-          '楽天用バナーを生成中... (1/2)';
+          '一生懸命楽天用バナー作成してます🙇（1/2）';
 
         const promptSuffix = buildPromptSuffix(feedbackText);
 
@@ -1837,7 +1837,7 @@ ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, bl
         // =============================================
         setStep(2, 'active');
         document.getElementById('status-msg').textContent =
-          'LINE 用バナーを生成中... (2/2)';
+          '一生懸命LINE用バナー作成してます🙇（2/2）';
 
         const linePrompt = `You are a professional Japanese e-commerce banner designer. Create a HIGH-QUALITY, PHOTOREALISTIC promotional banner image strictly following these specifications.
 
@@ -1874,7 +1874,7 @@ ALL Japanese characters must be correct, crisp, and readable. Do NOT distort, bl
         // =============================================
         setStep(3, 'active');
         document.getElementById('status-msg').textContent =
-          '画像をリサイズ中...';
+          'もうちょっとだけ待ってください...✨';
 
         rakutenDataUrl = await resizeImage(
           rakutenRaw.data, rakutenRaw.mimeType,
