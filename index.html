@@ -649,20 +649,30 @@
 
     .ref-image-remove:hover { color: var(--error); border-color: var(--error); }
 
-    /* ── Company settings ── */
-    .cs-title {
+    /* ── Company settings (details/summary toggle) ── */
+    #company-settings-card { padding: 0; }
+    #company-settings-card > summary { padding: 14px 28px; }
+    #company-settings-card > div     { padding: 0 28px 24px; }
+
+    .cs-summary {
       cursor: pointer;
       user-select: none;
       justify-content: space-between;
+      list-style: none;
+      margin-bottom: 0;
+      border-bottom: none;
     }
-    .cs-title:hover { color: var(--text); }
+    .cs-summary::-webkit-details-marker { display: none; }
+    .cs-summary::marker { display: none; }
+    .cs-summary:hover { color: var(--text); }
 
     .cs-chevron {
       font-size: 0.72rem;
       color: var(--text-muted);
       transition: transform 0.2s;
     }
-    .cs-chevron.open { transform: rotate(180deg); }
+    #company-settings-card[open] .cs-chevron { transform: rotate(180deg); }
+    #company-settings-card[open] > summary   { border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 0; }
 
     .btn-settings-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 
@@ -973,14 +983,14 @@
 
 
     <!-- =============================================
-         会社・ブランド設定カード
+         会社・ブランド設定カード（details/summary でトグル）
     ============================================= -->
-    <div class="card" id="company-settings-card">
-      <h2 class="card-title cs-title" onclick="toggleCompanySettings()">
+    <details class="card" id="company-settings-card">
+      <summary class="card-title cs-summary">
         <span><span class="icon">⚙️</span> 会社・ブランド設定</span>
-        <span class="cs-chevron" id="cs-chevron">▼</span>
-      </h2>
-      <div id="company-settings-body" style="display:none; padding-top:4px;">
+        <span class="cs-chevron">▼</span>
+      </summary>
+      <div id="company-settings-body" style="padding-top:4px;">
         <p class="input-note" style="margin-bottom:16px;">
           ブランドカラー・デザイン方針を設定すると、すべての生成に自動反映されます。<br>
           「書き出し（JSON）」で設定を保存し、他のメンバーに配布できます。
@@ -1022,7 +1032,7 @@
         </div>
         <p class="settings-saved-msg" id="settings-saved-msg" style="display:none;">✓ 設定を保存しました</p>
       </div>
-    </div>
+    </details>
 
     <!-- =============================================
          APIキーカード
@@ -1359,14 +1369,6 @@
     // =============================================
     // 会社・ブランド設定
     // =============================================
-    function toggleCompanySettings() {
-      var body    = document.getElementById('company-settings-body');
-      var chevron = document.getElementById('cs-chevron');
-      var isOpen  = body.style.display !== 'none';
-      body.style.display = isOpen ? 'none' : 'block';
-      chevron.classList.toggle('open', !isOpen);
-    }
-
     function loadCompanySettings() {
       var saved = localStorage.getItem('banner_company_settings');
       if (!saved) return;
