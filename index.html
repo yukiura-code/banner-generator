@@ -650,7 +650,19 @@
     .ref-image-remove:hover { color: var(--error); border-color: var(--error); }
 
     /* ── Company settings ── */
-    .toggle-icon { display: none; }
+    .cs-title {
+      cursor: pointer;
+      user-select: none;
+      justify-content: space-between;
+    }
+    .cs-title:hover { color: var(--text); }
+
+    .cs-chevron {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+    .cs-chevron.open { transform: rotate(180deg); }
 
     .btn-settings-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 
@@ -666,13 +678,10 @@
       cursor: pointer;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      transition: box-shadow 0.2s, opacity 0.15s;
+      transition: box-shadow 0.2s;
       box-shadow: 0 0 14px var(--neon-glow);
     }
-
-    .btn-settings-save:hover {
-      box-shadow: 0 0 22px var(--neon-glow), 0 0 40px var(--neon-glow-2);
-    }
+    .btn-settings-save:hover { box-shadow: 0 0 22px var(--neon-glow), 0 0 40px var(--neon-glow-2); }
 
     .btn-settings-sub {
       padding: 8px 14px;
@@ -684,15 +693,9 @@
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+      transition: border-color 0.2s, color 0.2s;
     }
-
-    .btn-settings-sub:hover {
-      border-color: rgba(255,255,255,0.4);
-      color: var(--text);
-      box-shadow: 0 0 18px rgba(255,255,255,0.1);
-      transform: translateY(-1px);
-    }
+    .btn-settings-sub:hover { border-color: rgba(255,255,255,0.4); color: var(--text); }
 
     .settings-saved-msg {
       margin-top: 10px;
@@ -968,17 +971,19 @@
       </div>
     </div>
 
+
     <!-- =============================================
-         会社・ブランド設定カード（管理者向け）
+         会社・ブランド設定カード
     ============================================= -->
     <div class="card" id="company-settings-card">
-      <h2 class="card-title">
-        <span class="icon">⚙️</span> 会社・ブランド設定
+      <h2 class="card-title cs-title" onclick="toggleCompanySettings()">
+        <span><span class="icon">⚙️</span> 会社・ブランド設定</span>
+        <span class="cs-chevron" id="cs-chevron">▼</span>
       </h2>
-      <div id="company-settings-body" style="padding-top:4px;">
+      <div id="company-settings-body" style="display:none; padding-top:4px;">
         <p class="input-note" style="margin-bottom:16px;">
           ブランドカラー・デザイン方針を設定すると、すべての生成に自動反映されます。<br>
-          「書き出し（JSON）」で設定ファイルを保存し、他のメンバーに配布できます。
+          「書き出し（JSON）」で設定を保存し、他のメンバーに配布できます。
         </p>
         <div class="form-row">
           <div class="form-group">
@@ -1011,8 +1016,8 @@
         <div class="btn-settings-row">
           <button class="btn-settings-save" onclick="saveCompanySettings()">設定を保存</button>
           <button class="btn-settings-sub" onclick="exportSettings()">書き出し（JSON）</button>
-          <button class="btn-settings-sub" onclick="document.getElementById('settings-import-file').click()">読み込み（JSON）</button>
-          <input type="file" id="settings-import-file" accept=".json" style="display:none"
+          <button class="btn-settings-sub" onclick="document.getElementById('cs-import-file').click()">読み込み（JSON）</button>
+          <input type="file" id="cs-import-file" accept=".json" style="display:none"
             onchange="importSettings(event)" />
         </div>
         <p class="settings-saved-msg" id="settings-saved-msg" style="display:none;">✓ 設定を保存しました</p>
@@ -1323,59 +1328,6 @@
       });
     }
 
-    // =============================================
-    // 会社・ブランド設定の管理
-    // =============================================
-    function loadCompanySettings() {
-      const saved = localStorage.getItem('banner_company_settings');
-      if (!saved) return;
-      try {
-        const s = JSON.parse(saved);
-        if (s.brandName)          document.getElementById('cs-brand-name').value          = s.brandName;
-        if (s.brandColors)        document.getElementById('cs-brand-colors').value        = s.brandColors;
-        if (s.designStyle)        document.getElementById('cs-design-style').value        = s.designStyle;
-        if (s.commonInstructions) document.getElementById('cs-common-instructions').value = s.commonInstructions;
-      } catch (_) {}
-    }
-
-    function saveCompanySettings() {
-      const s = {
-        brandName:          document.getElementById('cs-brand-name').value.trim(),
-        brandColors:        document.getElementById('cs-brand-colors').value.trim(),
-        designStyle:        document.getElementById('cs-design-style').value,
-        commonInstructions: document.getElementById('cs-common-instructions').value.trim(),
-      };
-      localStorage.setItem('banner_company_settings', JSON.stringify(s));
-      const msg = document.getElementById('settings-saved-msg');
-      msg.style.display = 'block';
-      setTimeout(() => { msg.style.display = 'none'; }, 2500);
-    }
-
-    function exportSettings() {
-      const data = localStorage.getItem('banner_company_settings') || '{}';
-      const blob = new Blob([data], { type: 'application/json' });
-      saveAs(blob, 'banner_company_settings.json');
-    }
-
-    function importSettings(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          JSON.parse(e.target.result);
-          localStorage.setItem('banner_company_settings', e.target.result);
-          loadCompanySettings();
-          const msg = document.getElementById('settings-saved-msg');
-          msg.style.display = 'block';
-          setTimeout(() => { msg.style.display = 'none'; }, 2500);
-        } catch (_) {
-          alert('JSONファイルの形式が正しくありません。');
-        }
-      };
-      reader.readAsText(file);
-      event.target.value = '';
-    }
 
 
     // ── セール期間: カレンダー → テキスト自動生成 ──
@@ -1402,6 +1354,68 @@
     function clearDatePicker() {
       document.getElementById('sale-start').value = '';
       document.getElementById('sale-end').value   = '';
+    }
+
+    // =============================================
+    // 会社・ブランド設定
+    // =============================================
+    function toggleCompanySettings() {
+      var body    = document.getElementById('company-settings-body');
+      var chevron = document.getElementById('cs-chevron');
+      var isOpen  = body.style.display !== 'none';
+      body.style.display = isOpen ? 'none' : 'block';
+      chevron.classList.toggle('open', !isOpen);
+    }
+
+    function loadCompanySettings() {
+      var saved = localStorage.getItem('banner_company_settings');
+      if (!saved) return;
+      try {
+        var s = JSON.parse(saved);
+        if (s.brandName)          document.getElementById('cs-brand-name').value          = s.brandName;
+        if (s.brandColors)        document.getElementById('cs-brand-colors').value        = s.brandColors;
+        if (s.designStyle)        document.getElementById('cs-design-style').value        = s.designStyle;
+        if (s.commonInstructions) document.getElementById('cs-common-instructions').value = s.commonInstructions;
+      } catch (_) {}
+    }
+
+    function saveCompanySettings() {
+      var s = {
+        brandName:          document.getElementById('cs-brand-name').value.trim(),
+        brandColors:        document.getElementById('cs-brand-colors').value.trim(),
+        designStyle:        document.getElementById('cs-design-style').value,
+        commonInstructions: document.getElementById('cs-common-instructions').value.trim(),
+      };
+      localStorage.setItem('banner_company_settings', JSON.stringify(s));
+      var msg = document.getElementById('settings-saved-msg');
+      msg.style.display = 'block';
+      setTimeout(function() { msg.style.display = 'none'; }, 2500);
+    }
+
+    function exportSettings() {
+      var data = localStorage.getItem('banner_company_settings') || '{}';
+      var blob = new Blob([data], { type: 'application/json' });
+      saveAs(blob, 'banner_company_settings.json');
+    }
+
+    function importSettings(event) {
+      var file = event.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          JSON.parse(e.target.result);
+          localStorage.setItem('banner_company_settings', e.target.result);
+          loadCompanySettings();
+          var msg = document.getElementById('settings-saved-msg');
+          msg.style.display = 'block';
+          setTimeout(function() { msg.style.display = 'none'; }, 2500);
+        } catch (_) {
+          alert('JSONファイルの形式が正しくありません。');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
     }
 
     // =============================================
